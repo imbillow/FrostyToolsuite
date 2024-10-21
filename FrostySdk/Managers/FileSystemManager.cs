@@ -8,6 +8,7 @@ using FrostySdk.Managers;
 using Frosty.Hash;
 using FrostySdk.Managers.Entries;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace FrostySdk
 {
@@ -75,22 +76,14 @@ namespace FrostySdk
 
         public IEnumerable<string> SuperBundles
         {
-            get
-            {
-                for (int i = 0; i < superBundles.Count; i++)
-                    yield return superBundles[i].Name;
-            }
+            get { return superBundles.Select(t => t.Name); }
         }
 
         public int CatalogCount => catalogs.Count;
 
         public IEnumerable<string> Catalogs
         {
-            get
-            {
-                for (int i = 0; i < catalogs.Count; i++)
-                    yield return catalogs[i].Name;
-            }
+            get { return catalogs.Select(t => t.Name); }
         }
 
         public int CasFileCount => casFiles.Count;

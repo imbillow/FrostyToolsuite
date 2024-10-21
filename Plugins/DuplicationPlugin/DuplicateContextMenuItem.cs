@@ -12,12 +12,14 @@ using FrostySdk.Resources;
 using MeshSetPlugin.Resources;
 //using SoundEditorPlugin.Resources;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 
@@ -447,7 +449,7 @@ namespace DuplicationPlugin
             // Add new bundle
             BundleEntry newBundle = App.AssetManager.AddBundle("win32/" + newName, BundleType.BlueprintBundle, 0);
 
-            newEntry.AddedBundles.Clear();
+            Interlocked.Exchange(ref newEntry.AddedBundles, new ConcurrentBag<int>());
             newEntry.AddedBundles.Add(App.AssetManager.GetBundleId(newBundle));
 
             newBundle.Blueprint = newEntry;

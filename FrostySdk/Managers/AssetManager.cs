@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 using FrostySdk.Managers.Entries;
 using FrostySdk.BaseProfile;
 
@@ -38,9 +39,9 @@ namespace FrostySdk.Managers
         #region -- Classes --
         internal class BinarySbDataHelper
         {
-            Dictionary<string, byte[]> ebxDataFiles = new Dictionary<string, byte[]>();
-            Dictionary<string, byte[]> resDataFiles = new Dictionary<string, byte[]>();
-            Dictionary<string, byte[]> chunkDataFiles = new Dictionary<string, byte[]>();
+            ConcurrentDictionary<string, byte[]> ebxDataFiles = new ConcurrentDictionary<string, byte[]>();
+            ConcurrentDictionary<string, byte[]> resDataFiles = new ConcurrentDictionary<string, byte[]>();
+            ConcurrentDictionary<string, byte[]> chunkDataFiles = new ConcurrentDictionary<string, byte[]>();
             AssetManager am;
 
             public BinarySbDataHelper(AssetManager inParent)
@@ -102,14 +103,12 @@ namespace FrostySdk.Managers
                 chunkDataFiles.Clear();
             }
 
-            private void FilterBinaryBundleData(DbObject baseList, DbObject deltaList, string listName, Dictionary<string, byte[]> dataFiles)
+            private void FilterBinaryBundleData(DbObject baseList, DbObject deltaList, string listName, ConcurrentDictionary<string, byte[]> dataFiles)
             {
                 foreach (DbObject entry in deltaList.GetValue<DbObject>(listName))
                 {
                     Sha1 sha1 = entry.GetValue<Sha1>("sha1");
-                    string name = entry.GetValue<string>("name");
-                    if (name == null)
-                        name = entry.GetValue<Guid>("id").ToString();
+                    string name = entry.GetValue<string>("name") ?? entry.GetValue<Guid>("id").ToString();
 
                     if (dataFiles.ContainsKey(name))
                         continue;
@@ -119,28 +118,24 @@ namespace FrostySdk.Managers
                     {
                         foreach (DbObject baseEntry in baseList.GetValue<DbObject>(listName))
                         {
-                            if (baseEntry.GetValue<Sha1>("sha1") == sha1)
-                            {
-                                entry.SetValue("size", baseEntry.GetValue<long>("size"));
-                                entry.SetValue("originalSize", baseEntry.GetValue<long>("originalSize"));
-                                entry.SetValue("offset", baseEntry.GetValue<long>("offset"));
-                                entry.RemoveValue("data");
+                            if (baseEntry.GetValue<Sha1>("sha1") != sha1) continue;
+                            entry.SetValue("size", baseEntry.GetValue<long>("size"));
+                            entry.SetValue("originalSize", baseEntry.GetValue<long>("originalSize"));
+                            entry.SetValue("offset", baseEntry.GetValue<long>("offset"));
+                            entry.RemoveValue("data");
 
-                                bFound = true;
-                                break;
-                            }
+                            bFound = true;
+                            break;
                         }
                     }
 
-                    if (!bFound)
-                    {
-                        byte[] data = Utils.CompressFile(entry.GetValue<byte[]>("data"));
-                        dataFiles.Add(name, data);
+                    if (bFound) continue;
+                    byte[] data = Utils.CompressFile(entry.GetValue<byte[]>("data"));
+                    dataFiles.TryAdd(name, data);
 
-                        entry.SetValue("size", data.Length);
-                        entry.AddValue("cache", true);
-                        entry.RemoveValue("sb");
-                    }
+                    entry.SetValue("size", data.Length);
+                    entry.AddValue("cache", true);
+                    entry.RemoveValue("sb");
                 }
             }
         }
@@ -428,7 +423,7 @@ namespace FrostySdk.Managers
                     // need to work out bundle here (as bundles are hashed names only)
                     if (TypeLibrary.IsSubClassOf(entry.Type, "BlueprintBundle") || TypeLibrary.IsSubClassOf(entry.Type, "SubWorldData"))
                     {
-                        BundleEntry be = m_bundles[entry.Bundles[0]];
+                        BundleEntry be = m_bundles[entry.Bundles.First()];
 
                         be.Name = entry.Name;
                         if (!be.Name.StartsWith("win32/", StringComparison.OrdinalIgnoreCase))
@@ -557,9 +552,9 @@ namespace FrostySdk.Managers
             if (!dataOnly)
             {
                 // revert the entire asset
-                entry.LinkedAssets.Clear();
-                entry.AddedBundles.Clear();
-                entry.RemBundles.Clear();
+                Interlocked.Exchange(ref entry.LinkedAssets, new ConcurrentBag<AssetEntry>());
+                Interlocked.Exchange(ref entry.AddedBundles, new ConcurrentBag<int>());
+                Interlocked.Exchange(ref entry.RemBundles, new ConcurrentBag<int>());
 
                 if (entry.IsAdded)
                 {
@@ -2141,11 +2136,19 @@ namespace FrostySdk.Managers
         #endregion
     }
 
-    static class Ext
+    public static class Ext
     {
         public static bool Remove<TK, TV>(this ConcurrentDictionary<TK, TV> self, TK key)
         {
             return self.TryRemove(key, out var _);
+        }
+        
+        public static void AddRange<TV>(this ConcurrentBag<TV> self, IEnumerable<TV> xs)
+        {
+            foreach (var v in xs)
+            {
+                self.Add(v);
+            }
         }
     }
 }

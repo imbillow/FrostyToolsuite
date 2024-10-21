@@ -122,10 +122,10 @@ namespace FrostyModManager
 
             Config.Load();
 
-            if (Config.Get<bool>("UpdateCheck", true) || Config.Get<bool>("UpdateCheckPrerelease", false))
+            /*if (Config.Get<bool>("UpdateCheck", true) || Config.Get<bool>("UpdateCheckPrerelease", false))
             {
                 CheckVersion();
-            }
+            }*/
 
             // get startup profile (if one exists)
             if (Config.Get<bool>("UseDefaultProfile", false))

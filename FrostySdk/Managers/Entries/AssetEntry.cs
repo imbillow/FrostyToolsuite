@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using Frosty.Hash;
 
 namespace FrostySdk.Managers.Entries
@@ -11,7 +13,7 @@ namespace FrostySdk.Managers.Entries
         Cache,
         CasNonIndexed
     }
-    
+
     public class AssetExtraData
     {
         public Sha1 BaseSha1;
@@ -21,7 +23,7 @@ namespace FrostySdk.Managers.Entries
         public bool IsPatch;
         public string CasPath = "";
     }
-    
+
     public class AssetEntry
     {
         public virtual string Name { get; set; }
@@ -29,18 +31,16 @@ namespace FrostySdk.Managers.Entries
         public virtual string AssetType { get; }
 
         public virtual string DisplayName => Filename + ((IsDirty) ? "*" : "");
-        public virtual string Filename
-        {
-            get
-            {
+
+        public virtual string Filename {
+            get {
                 int id = Name.LastIndexOf('/');
                 return id == -1 ? Name : Name.Substring(id + 1);
             }
         }
-        public virtual string Path
-        {
-            get
-            {
+
+        public virtual string Path {
+            get {
                 int id = Name.LastIndexOf('/');
                 return id == -1 ? "" : Name.Substring(0, id);
             }
@@ -55,15 +55,15 @@ namespace FrostySdk.Managers.Entries
         public AssetDataLocation Location;
         public AssetExtraData ExtraData;
 
-        public List<int> Bundles = new List<int>();
-        public List<int> AddedBundles = new List<int>();
-        public List<int> RemBundles = new List<int>();
+        public ConcurrentBag<int> Bundles = new ConcurrentBag<int>();
+        public ConcurrentBag<int> AddedBundles = new ConcurrentBag<int>();
+        public ConcurrentBag<int> RemBundles = new ConcurrentBag<int>();
 
         public ModifiedAssetEntry ModifiedEntry;
-        public List<AssetEntry> LinkedAssets = new List<AssetEntry>();
+        public ConcurrentBag<AssetEntry> LinkedAssets = new ConcurrentBag<AssetEntry>();
 
         private bool m_dirty;
-        
+
         /// <summary>
         /// returns true if this asset was added
         /// </summary>
@@ -82,21 +82,21 @@ namespace FrostySdk.Managers.Entries
         /// <summary>
         /// 
         /// </summary>
-        public bool HasModifiedData => ModifiedEntry != null && (ModifiedEntry.Data != null || ModifiedEntry.DataObject != null);
+        public bool HasModifiedData =>
+            ModifiedEntry != null && (ModifiedEntry.Data != null || ModifiedEntry.DataObject != null);
 
         /// <summary>
         /// returns true if this asset is considered modified through another linked asset
         /// ie. An ebx would be considered modified if its linked resource has been modified
         /// </summary>
-        public bool IsIndirectlyModified
-        {
-            get
-            {
+        public bool IsIndirectlyModified {
+            get {
                 foreach (AssetEntry entry in LinkedAssets)
                 {
                     if (entry.IsModified)
                         return true;
                 }
+
                 return false;
             }
         }
@@ -104,33 +104,16 @@ namespace FrostySdk.Managers.Entries
         /// <summary>
         /// returns true if this asset, or any asset linked to it is dirty
         /// </summary>
-        public virtual bool IsDirty
-        {
-            get
-            {
+        public virtual bool IsDirty {
+            get {
+                return m_dirty || LinkedAssets.Any(entry => entry.IsDirty);
+            }
+            set {
+                if (m_dirty == value) return;
+                m_dirty = value;
                 if (m_dirty)
                 {
-                    return true;
-                }
-
-                foreach (AssetEntry entry in LinkedAssets)
-                {
-                    if (entry.IsDirty)
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
-            set
-            {
-                if (m_dirty != value)
-                {
-                    m_dirty = value;
-                    if (m_dirty)
-                    {
-                        OnModified();
-                    }
+                    OnModified();
                 }
             }
         }
@@ -184,12 +167,10 @@ namespace FrostySdk.Managers.Entries
             bool added = false;
             foreach (int bid in bundles)
             {
-                if (!Bundles.Contains(bid) && !AddedBundles.Contains(bid))
-                {
-                    AddedBundles.Add(bid);
-                    IsDirty = true;
-                    added = true;
-                }
+                if (Bundles.Contains(bid) || AddedBundles.Contains(bid)) continue;
+                AddedBundles.Add(bid);
+                IsDirty = true;
+                added = true;
             }
 
             return added;
@@ -207,18 +188,18 @@ namespace FrostySdk.Managers.Entries
         {
             if (!addedOnly)
             {
-                for (int i = 0; i < Bundles.Count; i++)
+                foreach (var bundle in Bundles)
                 {
-                    if (!RemBundles.Contains(Bundles[i]))
+                    if (!RemBundles.Contains(bundle))
                     {
-                        yield return Bundles[i];
+                        yield return bundle;
                     }
                 }
             }
 
-            for (int i = 0; i < AddedBundles.Count; i++)
+            foreach (var bundle in AddedBundles)
             {
-                yield return AddedBundles[i];
+                yield return bundle;
             }
         }
 

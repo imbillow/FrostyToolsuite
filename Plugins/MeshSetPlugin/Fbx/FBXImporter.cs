@@ -7,9 +7,11 @@ using MeshSetPlugin.Fbx;
 using MeshSetPlugin.Resources;
 using SharpDX;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace MeshSetPlugin
 {
@@ -112,8 +114,8 @@ namespace MeshSetPlugin
             }
 
             // @hack
-            entry.LinkedAssets.Clear();
-            m_resEntry.LinkedAssets.Clear();
+            Interlocked.Exchange(ref entry.LinkedAssets, new ConcurrentBag<AssetEntry>());
+            Interlocked.Exchange(ref m_resEntry.LinkedAssets, new ConcurrentBag<AssetEntry>());
 
             using (FbxManager manager = new FbxManager())
             {
