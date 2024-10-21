@@ -16,7 +16,7 @@ namespace FrostySdk.Managers
                     if (toc == null)
                         continue;
 
-                    parent.m_superBundles.Add(new SuperBundleEntry() { Name = superBundleName });
+                    parent.AddSuperBundle(new SuperBundleEntry() { Name = superBundleName });
                     parent.WriteToLog("Loading data ({0})", superBundleName);
                     parent.ReportProgress(parent.m_superBundles.Count, parent.m_fileSystem.SuperBundleCount);
 
@@ -30,7 +30,7 @@ namespace FrostySdk.Managers
                             int size = (int)bundles.GetValue<DbObject>("sizes")[i];
 
                             // add new bundle entry
-                            parent.m_bundles.Add(new BundleEntry() { Name = bundleName, SuperBundleId = parent.m_superBundles.Count - 1 });
+                            parent.AddBundle(new BundleEntry() { Name = bundleName, SuperBundleId = parent.m_superBundles.Count - 1 });
                             int bundleId = parent.m_bundles.Count - 1;
 
                             DbObject sb = null;

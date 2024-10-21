@@ -111,6 +111,6 @@ fxc MeshFallback.hlsl /Tps_5_0 /EPS_MeshFallback /DPROFILE_20191101=1 /Fo.\Bin\2
 fxc UnpackNormals.hlsl /Tcs_5_0 /ECS_UnpackAxisAngle /Fo.\Bin\UnpackAxisAngle.vso
 fxc UnpackNormals.hlsl /Tcs_5_0 /ECS_UnpackQuaternion /Fo.\Bin\UnpackQuaternion.vso
 
-cd ..\FrostyEditor\bin\Developer\Debug
-FrostyCmd.exe "D:\OriginLibrary\originapps\Mass Effect Andromeda\MassEffectAndromeda.exe" shader
-copy ..\..\..\Shaders.bin .\Shaders.bin
+REM cd ..\FrostyEditor\bin\Developer\Debug
+REM rostyCmd.exe "D:\OriginLibrary\originapps\Mass Effect Andromeda\MassEffectAndromeda.exe" shader
+REM copy ..\..\..\Shaders.bin .\Shaders.bin

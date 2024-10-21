@@ -15,7 +15,7 @@ namespace FrostySdk.Managers
                 // all other games read from superbundles
                 foreach (string superBundleName in parent.m_fileSystem.SuperBundles)
                 {
-                    parent.m_superBundles.Add(new SuperBundleEntry() { Name = superBundleName });
+                    parent.AddSuperBundle(new SuperBundleEntry() { Name = superBundleName });
                     bool patchFileExists = false;
 
                     // process base toc, bail out if it doesnt exist
@@ -79,7 +79,7 @@ namespace FrostySdk.Managers
                         bool isBaseBundle = bundle.GetValue<bool>("base");
 
                         // add new bundle entry
-                        parent.m_bundles.Add(new BundleEntry() { Name = bundleName, SuperBundleId = parent.m_superBundles.Count - 1 });
+                        parent.AddBundle(new BundleEntry() { Name = bundleName, SuperBundleId = parent.m_superBundles.Count - 1 });
                         int bundleId = parent.m_bundles.Count - 1;
 
                         // obtain view of appropriate stream

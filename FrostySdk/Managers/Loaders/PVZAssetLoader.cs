@@ -26,7 +26,7 @@ namespace FrostySdk.Managers
                         //}
                         //else
                         {
-                            parent.m_superBundles.Add(new SuperBundleEntry() { Name = sbName });
+                            parent.AddSuperBundle(new SuperBundleEntry() { Name = sbName });
                             sbIndex = parent.m_superBundles.Count - 1;
                         }
 
@@ -150,7 +150,7 @@ namespace FrostySdk.Managers
                                             };
                                             if (parent.m_chunkList.ContainsKey(chunk.Id))
                                                 parent.m_chunkList.Remove(chunk.Id);
-                                            parent.m_chunkList.Add(chunk.Id, chunk);
+                                            parent.AddChunk(chunk);
                                         }
                                     }
                                 }
@@ -255,7 +255,7 @@ namespace FrostySdk.Managers
                                             };
                                             if (parent.m_chunkList.ContainsKey(chunk.Id))
                                                 parent.m_chunkList.Remove(chunk.Id);
-                                            parent.m_chunkList.Add(chunk.Id, chunk);
+                                            parent.AddChunk(chunk);
                                         }
                                     }
                                 }
@@ -270,7 +270,7 @@ namespace FrostySdk.Managers
                                 {
                                     // Now process bundle
                                     BundleEntry be = new BundleEntry { Name = bi.Name, SuperBundleId = sbIndex };
-                                    parent.m_bundles.Add(be);
+                                    parent.AddBundle(be);
 
                                     Stream stream = baseMf.CreateViewStream(bi.Offset, bi.Size);
 
@@ -378,7 +378,7 @@ namespace FrostySdk.Managers
                                 {
                                     // Now process bundle
                                     BundleEntry be = new BundleEntry { Name = bi.Name, SuperBundleId = sbIndex };
-                                    parent.m_bundles.Add(be);
+                                    parent.AddBundle(be);
 
                                     Stream stream = patchMf.CreateViewStream(bi.Offset, bi.Size);
 

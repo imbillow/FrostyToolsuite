@@ -34,16 +34,16 @@ namespace FrostySdk.Managers
                 {
                     foreach (string sbName in catalog.SuperBundles.Keys)
                     {
-                        SuperBundleEntry sbe = parent.m_superBundles.Find((SuperBundleEntry a) => a.Name == sbName);
+                        SuperBundleEntry sbe = parent.GetSuperBundle(sbName);
                         int sbIndex = -1;
 
                         if (sbe != null)
                         {
-                            sbIndex = parent.m_superBundles.IndexOf(sbe);
+                            sbIndex = parent.GetSuperBundleId(sbe);
                         }
                         else
                         {
-                            parent.m_superBundles.Add(new SuperBundleEntry { Name = sbName });
+                            parent.AddSuperBundle(new SuperBundleEntry { Name = sbName });
                             sbIndex = parent.m_superBundles.Count - 1;
                             parent.ReportProgress(parent.m_superBundles.Count, parent.m_fileSystem.SuperBundleCount);
                         }
@@ -158,7 +158,7 @@ namespace FrostySdk.Managers
 
                                             // Now process bundle
                                             BundleEntry be = new BundleEntry { Name = bundleName, SuperBundleId = sbIndex };
-                                            parent.m_bundles.Add(be);
+                                            parent.AddBundle(be);
 
                                             using (BinarySbReader bundleReader = new BinarySbReader(ms, parent.m_fileSystem.CreateDeobfuscator()))
                                             {
@@ -248,7 +248,10 @@ namespace FrostySdk.Managers
                                             int dataSize = reader.ReadInt();
 
                                             if (!parent.m_chunkList.ContainsKey(guid))
-                                                parent.m_chunkList.Add(guid, new ChunkAssetEntry());
+                                                parent.AddChunk(new ChunkAssetEntry
+                                                {
+                                                    Id = guid
+                                                });
 
                                             ChunkAssetEntry chunk = parent.m_chunkList[guid];
                                             chunk.Id = guid;

@@ -12,12 +12,12 @@ namespace FrostySdk.Managers
                 parent.WriteToLog("Loading data from manifest");
 
                 // @todo: Get proper superbundle names
-                parent.m_superBundles.Add(new SuperBundleEntry { Name = "<none>" });
+                parent.AddSuperBundle(new SuperBundleEntry { Name = "<none>" });
 
                 foreach (DbObject bundle in parent.m_fileSystem.EnumerateBundles())
                 {
                     BundleEntry be = new BundleEntry { Name = bundle.GetValue<string>("name"), SuperBundleId = 0 };
-                    parent.m_bundles.Add(be);
+                    parent.AddBundle(be);
 
                     if (bundle == null)
                         continue;
@@ -32,7 +32,7 @@ namespace FrostySdk.Managers
                 {
                     if (!parent.m_chunkList.ContainsKey(entry.Id))
                     {
-                        parent.m_chunkList.Add(entry.Id, entry);
+                        parent.AddChunk(entry);
                     }
                     else
                     {

@@ -3,6 +3,7 @@ using FrostySdk.Interfaces;
 using FrostySdk.IO;
 using FrostySdk.Resources;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -166,17 +167,29 @@ namespace FrostySdk.Managers
         private ResourceManager m_resourceManager;
         private ILogger m_logger;
 
-        private List<SuperBundleEntry> m_superBundles = new List<SuperBundleEntry>();
-        private List<BundleEntry> m_bundles = new List<BundleEntry>();
-        private Dictionary<string, EbxAssetEntry> m_ebxList = new Dictionary<string, EbxAssetEntry>(StringComparer.OrdinalIgnoreCase);
-        private Dictionary<string, ResAssetEntry> m_resList = new Dictionary<string, ResAssetEntry>();
-        private Dictionary<Guid, ChunkAssetEntry> m_chunkList = new Dictionary<Guid, ChunkAssetEntry>();
+        private ConcurrentDictionary<int, SuperBundleEntry> m_superBundles =
+            new ConcurrentDictionary<int, SuperBundleEntry>();
+
+        private ConcurrentDictionary<int, BundleEntry> m_bundles = new ConcurrentDictionary<int, BundleEntry>();
+
+        private ConcurrentDictionary<string, EbxAssetEntry> m_ebxList =
+            new ConcurrentDictionary<string, EbxAssetEntry>(StringComparer.OrdinalIgnoreCase);
+
+        private ConcurrentDictionary<string, ResAssetEntry> m_resList =
+            new ConcurrentDictionary<string, ResAssetEntry>();
+
+        private ConcurrentDictionary<Guid, ChunkAssetEntry> m_chunkList =
+            new ConcurrentDictionary<Guid, ChunkAssetEntry>();
 
         //private Dictionary<string, bool> ebxPaths = new Dictionary<string, bool>();
-        private Dictionary<Guid, EbxAssetEntry> m_ebxGuidList = new Dictionary<Guid, EbxAssetEntry>();
-        private Dictionary<ulong, ResAssetEntry> m_resRidList = new Dictionary<ulong, ResAssetEntry>();
+        private ConcurrentDictionary<Guid, EbxAssetEntry> m_ebxGuidList =
+            new ConcurrentDictionary<Guid, EbxAssetEntry>();
 
-        private Dictionary<string, ICustomAssetManager> m_customAssetManagers = new Dictionary<string, ICustomAssetManager>();
+        private ConcurrentDictionary<ulong, ResAssetEntry> m_resRidList =
+            new ConcurrentDictionary<ulong, ResAssetEntry>();
+
+        private ConcurrentDictionary<string, ICustomAssetManager> m_customAssetManagers =
+            new ConcurrentDictionary<string, ICustomAssetManager>();
 
         public AssetManager(FileSystemManager inFileSystem, ResourceManager inResourceManager)
         {
@@ -186,7 +199,7 @@ namespace FrostySdk.Managers
 
         public void RegisterCustomAssetManager(string type, Type managerType)
         {
-            m_customAssetManagers.Add(type, (ICustomAssetManager)Activator.CreateInstance(managerType));
+            m_customAssetManagers.TryAdd(type, (ICustomAssetManager)Activator.CreateInstance(managerType));
         }
 
         public void Initialize(bool additionalStartup = true, AssetManagerImportResult result = null)
@@ -222,7 +235,7 @@ namespace FrostySdk.Managers
                 DoEbxIndexing();
 
                 // determine if bundle is a blueprint bundle or a shared bundle
-                foreach (BundleEntry bundle in m_bundles)
+                foreach (BundleEntry bundle in m_bundles.Values)
                 {
                     bundle.Type = BundleType.SharedBundle;
                     bundle.Blueprint = GetEbxEntry(bundle.Name.Remove(0, 6));
@@ -393,7 +406,7 @@ namespace FrostySdk.Managers
                             //logger.Log("Existing asset found with same guid '{0}'", entry.Guid);
                             continue;
                         }
-                        m_ebxGuidList.Add(entry.Guid, entry);
+                        m_ebxGuidList.TryAdd(entry.Guid, entry);
                     }
                 }
                 else
@@ -430,7 +443,7 @@ namespace FrostySdk.Managers
                     {
                         string bundleName = "win32/" + entry.Name.ToLower() + "_bundle";
                         int h = Fnv1.HashString(bundleName);
-                        BundleEntry be = m_bundles.Find((BundleEntry a) => a.Name.Equals(h.ToString("x8")));
+                        BundleEntry be = m_bundles.Values.First((BundleEntry a) => a.Name.Equals(h.ToString("x8")));
 
                         if (be != null)
                         {
@@ -581,44 +594,56 @@ namespace FrostySdk.Managers
         public void AddChunk(ChunkAssetEntry entry)
         {
             entry.IsAdded = true;
-            m_chunkList.Add(entry.Id, entry);
+            m_chunkList.TryAdd(entry.Id, entry);
         }
         public void AddRes(ResAssetEntry entry)
         {
             entry.IsAdded = true;
-            m_resList.Add(entry.Name.ToLower(), entry);
-            m_resRidList.Add(entry.ResRid, entry);
+            m_resList.TryAdd(entry.Name.ToLower(), entry);
+            m_resRidList.TryAdd(entry.ResRid, entry);
         }
         public void AddEbx(EbxAssetEntry entry)
         {
             entry.IsAdded = true;
-            m_ebxList.Add(entry.Name.ToLower(), entry);
-            m_ebxGuidList.Add(entry.Guid, entry);
+            m_ebxList.TryAdd(entry.Name.ToLower(), entry);
+            m_ebxGuidList.TryAdd(entry.Guid, entry);
         }
+
+        public void AddSuperBundle(SuperBundleEntry entry)
+        {
+            m_superBundles.TryAdd(entry.Id, entry);
+        }
+        
+        public void AddBundle(BundleEntry entry)
+        {
+            m_bundles.TryAdd(entry.Id, entry);
+        }
+        
         #endregion
 
         #region -- Add Functions --
+        
         /// <summary>
         /// Adds a new bundle to the manager
         /// </summary>
         public BundleEntry AddBundle(string name, BundleType type, int sbIndex)
         {
-            int bindex = m_bundles.FindIndex((BundleEntry be) => be.Name == name);
-            if (bindex != -1)
+            try
             {
-                return m_bundles[bindex];
+                return GetBundleEntry(name);
             }
-
-            BundleEntry bentry = new BundleEntry
+            catch (Exception e)
             {
-                Name = name,
-                SuperBundleId = sbIndex,
-                Type = type,
-                Added = true
-            };
-            m_bundles.Add(bentry);
-
-            return bentry;
+                BundleEntry bentry = new BundleEntry
+                {
+                    Name = name,
+                    SuperBundleId = sbIndex,
+                    Type = type,
+                    Added = true
+                };
+                AddBundle(bentry);
+                return bentry;
+            }
         }
 
         /// <summary>
@@ -626,20 +651,20 @@ namespace FrostySdk.Managers
         /// </summary>
         public SuperBundleEntry AddSuperBundle(string name)
         {
-            int sbindex = m_superBundles.FindIndex((SuperBundleEntry sbe) => sbe.Name.Equals(name));
-            if (sbindex != -1)
+            try
             {
-                return m_superBundles[sbindex];
+                return GetSuperBundle(name);
             }
-
-            SuperBundleEntry sbentry = new SuperBundleEntry
+            catch (Exception e)
             {
-                Name = name,
-                Added = true
-            };
-            m_superBundles.Add(sbentry);
-
-            return sbentry;
+                SuperBundleEntry entry = new SuperBundleEntry
+                {
+                    Name = name,
+                    Added = true
+                };
+                AddSuperBundle(entry);
+                return entry;
+            }
         }
 
         /// <summary>
@@ -676,8 +701,7 @@ namespace FrostySdk.Managers
             entry.IsDirty = true;
             entry.IsAdded = true;
 
-            m_ebxList.Add(keyName, entry);
-            m_ebxGuidList.Add(entry.Guid, entry);
+            AddEbx(entry);
 
             return entry;
         }
@@ -722,8 +746,7 @@ namespace FrostySdk.Managers
 
             entry.ModifiedEntry.Sha1 = GenerateSha1(entry.ModifiedEntry.Data);
 
-            m_resList.Add(entry.Name, entry);
-            m_resRidList.Add(entry.ResRid, entry);
+            AddRes(entry);
 
             return entry;
         }
@@ -770,7 +793,7 @@ namespace FrostySdk.Managers
                 entry.Id = new Guid(guidBuf);
             }
 
-            m_chunkList.Add(entry.Id, entry);
+            AddChunk(entry);
             return entry.Id;
         }
         #endregion
@@ -971,7 +994,7 @@ namespace FrostySdk.Managers
         #region -- Enumeration Functions --
         public IEnumerable<SuperBundleEntry> EnumerateSuperBundles(bool modifiedOnly = false)
         {
-            foreach (SuperBundleEntry sbentry in m_superBundles)
+            foreach (SuperBundleEntry sbentry in m_superBundles.Values)
             {
                 if (modifiedOnly && !sbentry.Added)
                 {
@@ -983,7 +1006,7 @@ namespace FrostySdk.Managers
 
         public IEnumerable<BundleEntry> EnumerateBundles(BundleType type = BundleType.None, bool modifiedOnly = false)
         {
-            foreach (BundleEntry bentry in m_bundles)
+            foreach (BundleEntry bentry in m_bundles.Values)
             {
                 if (type != BundleType.None && bentry.Type != type)
                 {
@@ -1000,8 +1023,7 @@ namespace FrostySdk.Managers
 
         public IEnumerable<EbxAssetEntry> EnumerateEbx(BundleEntry bentry)
         {
-            int bindex = m_bundles.IndexOf(bentry);
-            return EnumerateEbx("", false, false, true, bindex);
+            return EnumerateEbx("", false, false, true, bentry.Id);
         }
 
         public IEnumerable<EbxAssetEntry> EnumerateEbx(string type = "", bool modifiedOnly = false, bool includeLinked = false, bool includeHidden = true, string bundleSubPath = "")
@@ -1061,10 +1083,9 @@ namespace FrostySdk.Managers
 
         public IEnumerable<ResAssetEntry> EnumerateRes(BundleEntry bentry)
         {
-            int bindex = m_bundles.IndexOf(bentry);
-            if (bindex == -1)
+            if (!m_bundles.ContainsKey(bentry.Id))
                 yield break;
-            foreach (ResAssetEntry entry in EnumerateRes(0, false, bindex))
+            foreach (ResAssetEntry entry in EnumerateRes(0, false, bentry.Id))
                 yield return entry;
         }
 
@@ -1116,12 +1137,11 @@ namespace FrostySdk.Managers
 
         public IEnumerable<ChunkAssetEntry> EnumerateChunks(BundleEntry bentry)
         {
-            int bindex = m_bundles.IndexOf(bentry);
-            if (bindex == -1)
+            if (!m_bundles.ContainsKey(bentry.Id))
                 yield break;
             foreach (ChunkAssetEntry entry in m_chunkList.Values)
             {
-                if (entry.Bundles.Contains(bindex))
+                if (entry.Bundles.Contains(bentry.Id))
                     yield return entry;
             }
         }
@@ -1147,22 +1167,26 @@ namespace FrostySdk.Managers
 
         #region -- Get Functions --
         public int GetSuperBundleId(SuperBundleEntry sbentry)
-            => m_superBundles.FindIndex((SuperBundleEntry sbe) => sbe.Name.Equals(sbentry.Name));
+            => sbentry.Id;
 
         public int GetSuperBundleId(string sbname)
-            => m_superBundles.FindIndex((SuperBundleEntry sbe) => sbe.Name.Equals(sbname, StringComparison.OrdinalIgnoreCase));
+            => GetSuperBundle(sbname).Id;
 
         public SuperBundleEntry GetSuperBundle(int id)
             => id >= m_superBundles.Count ? null : m_superBundles[id];
+        public SuperBundleEntry GetSuperBundle(string name)
+            => m_superBundles.Values.First((SuperBundleEntry sbe) => sbe.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
         public int GetBundleId(BundleEntry bentry)
-            => m_bundles.FindIndex((BundleEntry be) => be.Name.Equals(bentry.Name));
+            => bentry.Id;
 
         public int GetBundleId(string name)
-            => m_bundles.FindIndex((BundleEntry be) => be.Name.Equals(name));
+            => GetBundleEntry(name).Id;
 
         public BundleEntry GetBundleEntry(int bundleId)
             => bundleId >= m_bundles.Count ? null : m_bundles[bundleId];
+        public BundleEntry GetBundleEntry(string name)
+            => m_bundles.Values.First((BundleEntry be) => be.Name.Equals(name));
 
         public AssetEntry GetCustomAssetEntry(string type, string key)
             => !m_customAssetManagers.ContainsKey(type) ? null : m_customAssetManagers[type].GetAssetEntry(key);
@@ -1404,7 +1428,7 @@ namespace FrostySdk.Managers
                     entry.OriginalSize = res.GetValue<long>("originalSize");
 
                     // Add new resrid ref
-                    m_resRidList.Add(entry.ResRid, entry);
+                    AddRes(entry);
                 }
 
                 if (res.GetValue<bool>("cache") && entry.Location != AssetDataLocation.Cache)
@@ -1499,7 +1523,7 @@ namespace FrostySdk.Managers
                             IsPatch = superBundleName.StartsWith("native_patch")
                         };
                     }
-                    m_chunkList.Add(entry.Id, entry);
+                    AddChunk(entry);
                 }
             }
 
@@ -1577,7 +1601,7 @@ namespace FrostySdk.Managers
             //    }
             //}
 
-            m_ebxList.Add(name, entry);
+            AddEbx(entry);
             return entry;
         }
 
@@ -1640,10 +1664,7 @@ namespace FrostySdk.Managers
                 };
             }
 
-            m_resList.Add(name, entry);
-            if (entry.ResRid != 0)
-                m_resRidList.Add(entry.ResRid, entry);
-
+            AddRes(entry);
             return entry;
         }
 
@@ -1703,7 +1724,7 @@ namespace FrostySdk.Managers
                 entry.ExtraData = new AssetExtraData { DataOffset = 0xdeadbeef };
             }
 
-            m_chunkList.Add(chunkId, entry);
+            AddChunk(entry);
             return entry;
         }
         #endregion
@@ -1752,7 +1773,7 @@ namespace FrostySdk.Managers
                 {
                     if (!isPatched)
                     {
-                        m_superBundles.Add(new SuperBundleEntry() { Name = "<none>" });
+                        AddSuperBundle(new SuperBundleEntry() { Name = "<none>" });
                     }
                 }
                 else
@@ -1762,7 +1783,7 @@ namespace FrostySdk.Managers
                         SuperBundleEntry sbentry = new SuperBundleEntry { Name = reader.ReadNullTerminatedString() };
                         if (!isPatched)
                         {
-                            m_superBundles.Add(sbentry);
+                            AddSuperBundle(sbentry);
                         }
                     }
                 }
@@ -1785,7 +1806,7 @@ namespace FrostySdk.Managers
                         bentry.Name = bentry.Name.Remove(0, 6);
 
                     if (!isPatched)
-                        m_bundles.Add(bentry);
+                        AddBundle(bentry);
                 }
 
                 // ebx
@@ -1838,11 +1859,8 @@ namespace FrostySdk.Managers
                         if (ebxGuid != Guid.Empty)
                         {
                             entry.Guid = ebxGuid;
-                            if (m_ebxGuidList.ContainsKey(entry.Guid))
-                                continue;
-                            m_ebxGuidList.Add(ebxGuid, entry);
                         }
-                        m_ebxList.Add(entry.Name, entry);
+                        AddEbx(entry);
                     }
                 }
 
@@ -1886,9 +1904,7 @@ namespace FrostySdk.Managers
 
                     if (!isPatched)
                     {
-                        m_resList.Add(entry.Name, entry);
-                        if (entry.ResRid != 0)
-                            m_resRidList.Add(entry.ResRid, entry);
+                        AddRes(entry);
                     }
                 }
 
@@ -1952,7 +1968,7 @@ namespace FrostySdk.Managers
                         entry.Bundles.Add(reader.ReadInt());
 
                     if (!isPatched)
-                        m_chunkList.Add(entry.Id, entry);
+                        AddChunk(entry);
                 }
             }
 
@@ -1979,12 +1995,12 @@ namespace FrostySdk.Managers
                 else
                 {
                     writer.Write(m_superBundles.Count);
-                    foreach (SuperBundleEntry sbentry in m_superBundles)
+                    foreach (SuperBundleEntry sbentry in m_superBundles.Values)
                         writer.WriteNullTerminatedString(sbentry.Name);
                 }
 
                 writer.Write(m_bundles.Count);
-                foreach (BundleEntry bentry in m_bundles)
+                foreach (BundleEntry bentry in m_bundles.Values)
                 {
                     writer.WriteNullTerminatedString(bentry.Name);
                     writer.Write(bentry.SuperBundleId);
@@ -2123,5 +2139,13 @@ namespace FrostySdk.Managers
             return loaderTypes[name].Name;
         }
         #endregion
+    }
+
+    static class Ext
+    {
+        public static bool Remove<TK, TV>(this ConcurrentDictionary<TK, TV> self, TK key)
+        {
+            return self.TryRemove(key, out var _);
+        }
     }
 }

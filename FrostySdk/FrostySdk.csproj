@@ -120,6 +120,7 @@
     <Compile Include="IO\NativeWriter.cs" />
     <Compile Include="Managers\AssetManager.cs" />
     <Compile Include="Managers\Entries\AssetEntry.cs" />
+    <Compile Include="Managers\Entries\BaseEntry.cs" />
     <Compile Include="Managers\Entries\BundleEntry.cs" />
     <Compile Include="Managers\Entries\ChunkAssetEntry.cs" />
     <Compile Include="Managers\Entries\EbxAssetEntry.cs" />

@@ -7,8 +7,8 @@ namespace FrostySdk.Managers.Entries
         BlueprintBundle,
         SharedBundle
     }
-    
-    public class BundleEntry
+
+    public class BundleEntry : BaseEntry
     {
         public string DisplayName => Name;
 

@@ -28,7 +28,7 @@ namespace FrostySdk.Managers
                 foreach (SuperBundleInfo sbInfo in parent.m_fileSystem.EnumerateSuperBundleInfos())
                 {
                     string sbName = sbInfo.Name;
-                    parent.m_superBundles.Add(new SuperBundleEntry() { Name = sbName });
+                    parent.AddSuperBundle(new SuperBundleEntry() { Name = sbName });
                     int sbIndex = parent.m_superBundles.Count - 1;
 
                     List<BaseBundleInfo> bundles = new List<BaseBundleInfo>();
@@ -266,7 +266,7 @@ namespace FrostySdk.Managers
                             parent.m_chunkList.Remove(chunk.Id);
                         }
 
-                        parent.m_chunkList.Add(chunk.Id, chunk);
+                        parent.AddChunk(chunk);
                     }
                 }
             }
@@ -285,9 +285,9 @@ namespace FrostySdk.Managers
                     // Now process bundle
                     BundleEntry be = new BundleEntry { Name = bi.Name, SuperBundleId = sbIndex };
 
-                    int idx = parent.m_bundles.FindIndex(b => b.Name == bi.Name);
+                    int idx = parent.GetBundleId(bi.Name);
 
-                    parent.m_bundles.Add(be);
+                    parent.AddBundle(be);
 
                     if ((bi.Size & 0xC0000000) == 0x40000000)
                     {
